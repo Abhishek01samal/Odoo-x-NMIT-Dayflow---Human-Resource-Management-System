@@ -25,6 +25,11 @@ export const useAuth = () => {
   };
 
   const navigate = useNavigate();
+
+  // TEMP: route by role until HR/Admin dashboards exist
+  const dashboardRouteFor = (role?: string) =>
+    role === "EMPLOYEE" ? "/employee/dashboard" : "/dashboard";
+
   const register = async ({ name, email, password }: RegisterData) => {
     try {
       setIsLoading(true);
@@ -34,12 +39,10 @@ export const useAuth = () => {
         password,
       });
       const user = res?.data?.data?.user;
-      //   console.log(res);
       toast.success(res.data?.message || "Register successfully");
       setUser(user);
-      navigate("/dashboard");
+      navigate(dashboardRouteFor(user?.role));
     } catch (error: any) {
-      // console.log(error?.response?.data || error);
       toast.error(error?.response?.data?.message || "Register failed");
     } finally {
       setIsLoading(false);
@@ -54,12 +57,9 @@ export const useAuth = () => {
         password,
       });
       const user = res?.data?.data?.user;
-      // console.log(res);
       toast.success(res.data?.message || "Login successfully");
       setUser(user);
-      // console.log("user saved in state");
-
-      navigate("/dashboard");
+      navigate(dashboardRouteFor(user?.role));
     } catch (error: any) {
       // console.log(error?.response?.data || error);
       toast.error(error?.response?.data?.message || "Login failed");
