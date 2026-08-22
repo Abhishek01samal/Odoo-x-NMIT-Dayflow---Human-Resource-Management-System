@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   BriefcaseBusiness,
   Building2,
@@ -228,6 +229,27 @@ export default function EmployeeProfile() {
                 value={profile.ifscCode}
                 className="sm:col-span-2"
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Account &amp; Security</CardTitle>
+              <CardDescription>
+                Sign-in credentials and session settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{user?.email}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="size-3.5" />
+                  Email verified
+                </p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/dashboard">Manage password</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>

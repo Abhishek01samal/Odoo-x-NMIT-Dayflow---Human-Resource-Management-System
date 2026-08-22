@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import {
   BadgeIndianRupee,
   CalendarCheck2,
@@ -136,18 +137,26 @@ export default function EmployeeDashboard() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {getGreeting()}, {firstName}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString("en-IN", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {getGreeting()}, {firstName}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString("en-IN", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/employee/profile" className="gap-1.5">
+            <UserRound className="size-4" />
+            My Profile
+          </Link>
+        </Button>
       </div>
 
       {/* Stats */}
