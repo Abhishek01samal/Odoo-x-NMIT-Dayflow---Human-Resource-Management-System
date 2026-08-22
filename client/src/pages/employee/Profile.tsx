@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   BriefcaseBusiness,
   Building2,
@@ -8,6 +9,7 @@ import {
   Landmark,
   Mail,
   MapPin,
+  Pencil,
   PhoneCall,
   ShieldCheck,
   UserRound,
@@ -16,9 +18,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { InfoField } from "@/components/shared/InfoField";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { EditProfileDialog } from "@/components/employee/EditProfileDialog";
 import { ProfileSkeleton } from "@/components/skeletons/ProfileSkeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -26,6 +30,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import type { EmployeeProfile } from "@/types";
 
 const GENDER_LABEL: Record<string, string> = {
   MALE: "Male",
@@ -45,7 +50,16 @@ const formatDate = (iso: string | null) =>
 
 export default function EmployeeProfile() {
   const { user } = useAuth();
-  const { profile, isLoading, error, refetch } = useProfile();
+  const { profile, isLoading, error, refetch, updateProfile } = useProfile();
+  const [editOpen, setEditOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async (patch: Partial<EmployeeProfile>) => {
+    setIsSaving(true);
+    const ok = await updateProfile(patch);
+    setIsSaving(false);
+    return ok;
+  };
 
   if (isLoading) return <ProfileSkeleton />;
   if (error)
@@ -108,6 +122,16 @@ export default function EmployeeProfile() {
               </Badge>
             </div>
           </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 sm:ml-auto"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="size-3.5" />
+            Edit Profile
+          </Button>
         </CardContent>
       </Card>
 
@@ -208,6 +232,14 @@ export default function EmployeeProfile() {
           </Card>
         </div>
       </div>
+
+      <EditProfileDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        profile={profile}
+        saving={isSaving}
+        onSave={handleSave}
+      />
     </div>
   );
 }
