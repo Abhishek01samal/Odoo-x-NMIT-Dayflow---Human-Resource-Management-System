@@ -1,142 +1,151 @@
 # Dayflow — Human Resource Management System
 
-Dayflow is a modern, enterprise-grade Human Resource Management System (HRMS) built to streamline organizational workflows. It features a robust Role-Based Access Control (RBAC) architecture, separating concerns across Employees, HR Managers, and Administrators, ensuring secure and efficient management of profiles, attendance, leaves, payroll, and system configurations.
+Dayflow is a modern, enterprise-grade Human Resource Management System (HRMS). It is designed to act as the central nervous system for organizational operations, handling employee data, attendance workflows, leave approvals, and system administration. 
+
+This repository acts as a comprehensive monorepo containing both the Frontend (React/Vite) and Backend (Node.js/Express) architectures.
 
 ---
 
-## 🏗️ Architecture Overview
+## 🏗️ Architectural Blueprint
 
-Dayflow is built on a modern **Full-Stack Monorepo Architecture**, separating the frontend client and backend API while maintaining unified typings and cohesive development workflows.
+### The "Skeleton" Model Architecture
+The Frontend of Dayflow is built on a **Skeleton/Shell Model Architecture**. Instead of loading full monolithic pages on every route change, the application relies on a unified, persistent "Shell". 
 
-### 🛡️ Role-Based Access Control (RBAC)
-The application is structurally divided by roles. Access is enforced both on the client-side (via React Router guards and unified Layouts) and server-side (via JWT validation and route middleware).
-- **EMPLOYEE**: Access to self-service portals (Dashboard, Profile, Attendance tracking, Leave requests).
-- **HR**: Access to organizational management (Employee directories, Attendance management, Leave approvals).
-- **ADMIN**: Access to system-wide settings (User management, Department configs, System reports).
+1. **The Core Layout (`Layout.tsx`)**
+   - **AppHeader:** Persistent top navigation that displays user context (Name, Role, Avatar) and authentication controls (Logout). It is aware of the user's role and adjusts routing dynamically.
+   - **Sidebar:** A highly dynamic, role-aware navigation pane. It categorizes routes logically (e.g., *Self Service*, *HR Management*, *Administration*). If an Employee logs in, they only see *Self Service*. If an Admin logs in, the sidebar expands to include *HR* and *Admin* panels.
+   - **Content Outlet (`main` wrapper):** The only part of the DOM that actually re-renders when navigating between pages. This ensures instantaneous page transitions and prevents UI flashing.
+   - **Footer:** Persistent branding and bottom navigation.
 
-### 🔐 Authentication Flow
-- **Stateless & Secure**: Utilizes JWTs stored in `httpOnly` cookies, preventing XSS attacks.
-- **Session Management**: Redis is used to manage active sessions, allowing for immediate invalidation of compromised tokens.
-- **Auto-Refresh**: Axios interceptors automatically catch `401 Unauthorized` responses and attempt token refreshes transparently before prompting re-authentication.
+2. **Role-Based Routing (`Protected.tsx` & `App.tsx`)**
+   - We do not rely on UI hiding alone. Security is enforced via hard route guards.
+   - The `<Protected allowedRoles={["ADMIN", "HR"]} />` component wraps route groups. If an unauthorized user attempts to access `/admin/dashboard`, the router intercepts the request and force-redirects them to their designated landing page.
 
----
-
-## 🛠️ Technology Stack
-
-### Frontend (`/client`)
-- **Core**: React 19, TypeScript, Vite
-- **Routing**: React Router v7
-- **Styling**: Tailwind CSS v4, custom utility classes, CSS Variables
-- **UI Components**: shadcn/ui, Radix UI primitives, Lucide React (icons)
-- **State & Data Fetching**: Context API, Axios, custom React hooks
-- **Data Visualization**: Recharts
-
-### Backend (`/server`)
-- **Core**: Node.js, Express 5, TypeScript
-- **Database**: PostgreSQL (Relational Data)
-- **ORM**: Prisma (Type-safe database access)
-- **Caching & Sessions**: Redis
-- **Security**: bcrypt (password hashing), jsonwebtoken (auth)
-- **API Documentation**: Swagger UI
+3. **Perceived Performance (Skeleton Screens)**
+   - Before data is fetched from the API, pages render `Skeleton` components. This provides the illusion of instant load times, keeping the structural layout of the page visible while the exact data (tables, charts) resolves in the background.
 
 ---
 
-## 📂 Project Structure
+## 🧩 Detailed Technology Stack & "Why We Chose It"
+
+### Frontend (Client-Side)
+- **Vite & React 19:** We use Vite as the bundler instead of Webpack for near-instant Hot Module Replacement (HMR). React 19 provides the latest concurrent rendering features.
+- **TypeScript:** Enforces strict typing across the entire monorepo. This eliminates runtime type errors, especially when passing user objects from the Auth Context to various UI components.
+- **React Router v7:** Handles complex nested routing. We use the `<Routes>` and `<Route>` structure to easily wrap entire sections of the app inside our `<Protected>` guard.
+- **Tailwind CSS v4 & CSS Variables:** All styling is utility-first. By using CSS variables mapped to `oklch` color spaces, we easily achieved a flawless, unified **Dark/Light Theme** system without writing separate stylesheets.
+- **shadcn/ui & Radix UI:** Radix provides the unstyled, fully accessible functionality (dropdowns, dialogs). `shadcn/ui` provides the beautifully designed wrappers. We use these for our Inputs, Cards, Avatars, and Buttons to guarantee a premium, consistent feel.
+- **Recharts:** Used on the Admin and HR dashboards for beautiful, responsive SVG charting (e.g., Role Distributions, Attendance Trends).
+- **React Hot Toast:** For global, unobtrusive notifications (success, error) that pop up at the top center.
+
+### Backend (Server-Side)
+- **Node.js & Express 5:** The backbone of our RESTful API. Express 5 provides native Promise support, meaning we don't need `try/catch` wrapper utilities for every asynchronous controller.
+- **PostgreSQL:** The primary relational database. Chosen for its strict ACID compliance, which is absolutely critical for an HR system handling sensitive payroll and user access data.
+- **Prisma ORM:** Provides type-safe database querying. Instead of writing raw SQL, Prisma generates a strict TypeScript client based on our `schema.prisma` file, ensuring our backend never asks for columns that don't exist.
+- **Redis:** An in-memory data store used for **Session Management**. While JWTs are used for authentication, Redis tracks which tokens are active, allowing Administrators to instantly revoke sessions (e.g., if an employee is terminated).
+- **JWT (JSON Web Tokens) via httpOnly Cookies:** 
+  - *Why?* Storing tokens in `localStorage` is vulnerable to Cross-Site Scripting (XSS). 
+  - *Solution:* Our backend sends tokens as `httpOnly` cookies, meaning malicious JavaScript cannot access them. The browser automatically includes these cookies in API requests.
+- **Axios Interceptors:** On the frontend, Axios intercepts every outgoing API request. If the backend responds with `401 Unauthorized` (meaning the token expired), the interceptor automatically attempts to hit a `/refresh-token` endpoint. If that fails, it force-logs the user out, ensuring extreme security.
+
+---
+
+## 📂 Deep Dive: Project Directory Structure
 
 ```text
 Dayflow-HRMS/
 │
-├── client/                     # Frontend React Application
-│   ├── public/                 # Static assets (images, icons)
+├── client/                     # Frontend Application
 │   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   │   ├── shared/         # Global layout components (AppHeader, Sidebar, Footer, Layout)
-│   │   │   └── ui/             # Primitive UI components (shadcn/ui - Buttons, Inputs, Cards)
-│   │   ├── context/            # React Context providers (AuthContext, ThemeContext)
-│   │   ├── hooks/              # Custom React hooks (useAuth, useAdminUsers)
-│   │   ├── lib/                # Utility functions and helpers
-│   │   ├── pages/              # Route components mapped to URLs
-│   │   │   ├── admin/          # Admin-only views (Users, Departments, Reports)
-│   │   │   ├── employee/       # Employee self-service views
-│   │   │   ├── hr/             # HR management views
-│   │   │   └── SignIn.tsx      # Unified authentication portal
-│   │   ├── services/           # Axios API instances and request methods
-│   │   ├── types/              # TypeScript interfaces and type definitions
-│   │   ├── App.tsx             # Main application router and Protected route definitions
-│   │   └── main.tsx            # React application entry point
-│   ├── index.css               # Global stylesheets and Tailwind configurations
-│   └── package.json            # Client dependencies
+│   │   ├── components/
+│   │   │   ├── shared/         # Core Architecture (Layout, AppHeader, Sidebar, Footer)
+│   │   │   ├── ui/             # Reusable UI Primitives (shadcn/ui Buttons, Inputs, Spinners)
+│   │   │   └── Protected.tsx   # The Role-Based Route Guard logic
+│   │   │
+│   │   ├── context/            
+│   │   │   ├── AuthContext.tsx # Centralized State for the User Session (who is logged in?)
+│   │   │   └── ThemeContext.tsx# Manages Light/Dark mode toggling
+│   │   │
+│   │   ├── hooks/              
+│   │   │   ├── useAuth.ts      # Wraps API calls (login, register, logout) + Context updates
+│   │   │   └── useAdminUsers.ts# Custom hook to fetch user lists for the Admin dashboard
+│   │   │
+│   │   ├── pages/              # Mapped 1:1 with URLs
+│   │   │   ├── admin/          # /admin/* (AdminDashboard, Users, Departments)
+│   │   │   ├── employee/       # /employee/* (EmployeeDashboard, Attendance, Leave)
+│   │   │   ├── hr/             # /hr/* (HrDashboard, Employees)
+│   │   │   └── SignIn.tsx      # The gateway. Includes a "Dev Mode" to bypass the backend.
+│   │   │
+│   │   ├── services/           
+│   │   │   ├── api.ts          # Axios instance config + 401 Interceptor logic
+│   │   │   └── auth.api.ts     # The actual Axios network requests for authentication
+│   │   │
+│   │   └── App.tsx             # The master Router mapping URLs to Pages inside the Layout
+│   │
+│   └── package.json            # Client dependencies (React, Vite, Tailwind, etc.)
 │
 ├── server/                     # Backend API Application
-│   ├── prisma/                 # Prisma schema definitions and migrations
+│   ├── prisma/                 # Database Schema (defines Users, Attendance, Leaves)
 │   ├── src/
-│   │   ├── controllers/        # Request handlers (Auth, Users, Attendance)
-│   │   ├── middlewares/        # Express middlewares (Auth guard, Role guard, Error handler)
-│   │   ├── routes/             # API route definitions
-│   │   ├── services/           # Business logic and database operations
-│   │   └── server.ts           # Express application entry point
-│   ├── .env.sample             # Example environment variables
-│   └── package.json            # Server dependencies
+│   │   ├── controllers/        # The actual logic (e.g. loginController, createUserController)
+│   │   ├── middlewares/        # Express middleware (e.g. verifyToken, requireAdminRole)
+│   │   ├── routes/             # Maps URLs to Controllers (e.g. router.post('/login', loginController))
+│   │   └── server.ts           # Binds everything to a port and starts Express
+│   │
+│   └── .env                    # Hidden environment variables (DB URLs, Secrets)
 │
-├── docker-compose.yml          # Infrastructure setup (Postgres, Redis)
-└── README.md                   # Project documentation
+└── docker-compose.yml          # Containerizes Postgres and Redis for 1-click startup
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Environment Setup & Execution
 
 ### Prerequisites
-- Node.js (v18 or higher)
-- Docker & Docker Compose (for database and cache)
+- Node.js (v18+)
+- Docker & Docker Compose (Critical for spinning up the PostgreSQL and Redis instances)
 
-### 1. Infrastructure Setup
-Start the local PostgreSQL database and Redis server using Docker Compose:
+### 1. Database & Cache Initialization
+From the root directory, start the Docker containers in the background:
 ```bash
 docker-compose up -d
 ```
+*This binds Postgres to port `5431` and Redis to port `6379`.*
 
-### 2. Backend Setup
-Navigate to the server directory, install dependencies, and configure the environment:
+### 2. Backend Boot Sequence
+Navigate to the `server/` directory:
 ```bash
 cd server
 npm install
 
-# Copy the sample environment file and configure it
-cp .env.sample .env
-
-# Generate Prisma client and run migrations
+# Push the schema to the running Postgres container
+npx prisma db push
 npx prisma generate
-npx prisma migrate dev
 
-# Start the development server (runs on http://localhost:5000)
+# Start the Node/Express server (Listens on port 5000)
 npm run dev
 ```
 
-### 3. Frontend Setup
-In a new terminal window, navigate to the client directory:
+### 3. Frontend Boot Sequence
+Open a new terminal window and navigate to the `client/` directory:
 ```bash
 cd client
 npm install
 
-# Start the Vite development server (runs on http://localhost:5173 or 5174)
+# Start the Vite development server (Listens on port 5173/5174)
 npm run dev
 ```
 
 ---
 
-## 🧪 Developer Features
+## 🛠️ The "Dev Mode" Authentication Bypass
+When doing rapid UI/UX frontend development, constantly spinning up the backend and database creates friction. 
 
-### Frontend Dev Mode (Bypass Backend)
-When the backend is offline or you want to rapidly prototype UI changes without managing database states, the `/sign-in` page features a **Dev Mode** section. 
-Clicking the `Admin`, `HR`, or `Employee` dev buttons will automatically generate a mock JWT session in `localStorage`, bypass Axios API interceptors, and route you directly to the respective dashboards with simulated role access.
-
----
-
-## 🤝 Contribution Guidelines
-1. Ensure components use the centralized `Layout.tsx` to maintain UI consistency.
-2. Add new routes to `App.tsx` and ensure they are wrapped in `<Protected allowedRoles={[...]} />` based on the RBAC architecture.
-3. Update `Sidebar.tsx` navigation items by adding them to the `navItems` array with the correct `roles` assigned.
+To solve this, Dayflow includes a highly integrated **Dev Mode** on the `/sign-in` screen. 
+- If you click `Admin`, `HR`, or `Employee` under the **Dev Mode** section, the application intercepts the login attempt. 
+- Instead of firing an Axios request to the backend, it generates a complete `MockUser` object in memory.
+- It pushes this object into `localStorage` and updates the React `AuthContext` instantly.
+- The router instantly evaluates the role and drops you into the correct dashboard.
+- Because it relies on `localStorage`, you can safely refresh the browser and the mock session will persist, allowing you to test layouts without ever touching the Node server.
 
 ## 📄 License
-This project is proprietary and confidential.
+This architecture and source code is proprietary. All rights reserved.

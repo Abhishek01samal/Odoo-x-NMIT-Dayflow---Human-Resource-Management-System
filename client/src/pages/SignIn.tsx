@@ -201,14 +201,6 @@ const SignIn = () => {
 
               {/* Image panel */}
               <div className="relative hidden bg-muted md:block">
-                <img
-                  src="/signin-bg.png"
-                  alt="Sign in visual"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col justify-end p-8">
                   <div className="space-y-3">
                     <div className="flex gap-2">
