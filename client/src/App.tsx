@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import EmployeeDashboard from "./pages/employee/Dashboard";
+import EmployeeProfile from "./pages/employee/Profile";
 
 const App = () => {
   const { user, getUser, isInitialized } = useAuth();
@@ -65,6 +66,7 @@ const App = () => {
       <Route element={<Protected />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/employee/dashboard" element={<EmployeeDashboard />} />
+        <Route path="/employee/profile" element={<EmployeeProfile />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
