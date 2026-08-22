@@ -3,6 +3,7 @@ import { otpMail } from "../emails/send-otp.js";
 import { verificationMail } from "../emails/verify-email.js";
 import { oauthWelcomeMail } from "../emails/oauth-welcome-mail.js";
 import { transporter } from "../lib/nodemailer.js";
+import logger from "../lib/logger.js";
 
 const sendRegistrationMail = async (
   username: string,
@@ -20,7 +21,7 @@ const sendRegistrationMail = async (
     });
     // console.log("Message sent: %s", info.messageId);
   } catch (err) {
-    console.error("Error while sending mail:", err);
+    logger.error("Error while sending mail:", err);
   }
 };
 
@@ -40,7 +41,7 @@ const sendVerificationMail = async (
     });
     // console.log("Message sent: %s", info.messageId);
   } catch (err) {
-    console.error("Error while sending mail:", err);
+    logger.error("Error while sending mail:", err);
   }
 };
 
@@ -56,7 +57,7 @@ const sendOtpMail = async (email: string, otp: string) => {
     });
     // console.log("Message sent: %s", info.messageId);
   } catch (err) {
-    console.error("Error while sending mail:", err);
+    logger.error("Error while sending mail:", err);
   }
 };
 
@@ -81,7 +82,7 @@ const sendOauthWelcomeMail = async (
     });
     // console.log("Message sent: %s", info.messageId);
   } catch (err) {
-    console.error("Error while sending mail:", err);
+    logger.error("Error while sending mail:", err);
   }
 };
 

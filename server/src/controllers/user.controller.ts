@@ -1,11 +1,12 @@
 import { prisma } from "../lib/prisma.js";
 import { redisClient } from "../lib/redis.js";
+import logger from "../lib/logger.js";
 import AsyncHandler from "../utils/async-handler.js";
 import crypto from "crypto";
 import { sendVerificationMail } from "../utils/send-mails.js";
 import ApiResponse from "../utils/api-response.js";
 import { comparePassword, hashPassword } from "../lib/bcrypt.js";
-import ApiError from "../utils/api-error.js";
+import { BadRequestError, UnauthorizedError } from "../utils/api-error.js";
 
 /**
  * @route POST /api/v1/users/verify-email
@@ -17,7 +18,7 @@ const verifyUserEmail = AsyncHandler(async (req: any, res: any) => {
   const user = await prisma.user.findUnique({ where: { id } });
 
   if (!user) {
-    throw new ApiError(401, "Invalid Credentials");
+    throw new UnauthorizedError("Invalid Credentials");
   }
 
   const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -30,6 +31,8 @@ const verifyUserEmail = AsyncHandler(async (req: any, res: any) => {
 
   const verifyLink = `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email?id=${user.id}&verifyToken=${verificationToken}`;
   sendVerificationMail(user.name, user.email, verifyLink);
+
+  logger.info(`Verification email sent to ${user.email}`);
 
   return res.status(200).json(new ApiResponse(200, "Verification email sent"));
 });
@@ -68,7 +71,7 @@ const getUserProfile = AsyncHandler(async (req: any, res: any) => {
   });
 
   if (!user) {
-    throw new ApiError(401, "Invalid Credentials");
+    throw new UnauthorizedError("Invalid Credentials");
   }
 
   await redisClient.set(
@@ -93,11 +96,13 @@ const changePassword = AsyncHandler(async (req: any, res: any) => {
   const { id } = req.user;
 
   if (!oldPassword || !newPassword) {
-    throw new ApiError(400, "All fields are required");
+    throw new BadRequestError("All fields are required");
   }
 
   if (oldPassword === newPassword) {
-    throw new ApiError(400, "New password must be different from old password");
+    throw new BadRequestError(
+      "New password must be different from old password"
+    );
   }
 
   const user = await prisma.user.findUnique({
@@ -110,11 +115,10 @@ const changePassword = AsyncHandler(async (req: any, res: any) => {
   });
 
   if (!user) {
-    throw new ApiError(401, "Invalid Credentials");
+    throw new UnauthorizedError("Invalid Credentials");
   }
   if (!user.password) {
-    throw new ApiError(
-      400,
+    throw new BadRequestError(
       "User registered via OAuth, password change not allowed"
     );
   }
@@ -122,7 +126,8 @@ const changePassword = AsyncHandler(async (req: any, res: any) => {
   const isMatched = await comparePassword(oldPassword, user.password);
 
   if (!isMatched) {
-    throw new ApiError(400, "Password is incorrect");
+    logger.warn(`Incorrect old password on change-password for ${user.email}`);
+    throw new BadRequestError("Password is incorrect");
   }
 
   const hashedPassword = await hashPassword(newPassword);
@@ -131,6 +136,8 @@ const changePassword = AsyncHandler(async (req: any, res: any) => {
     where: { id },
     data: { password: hashedPassword },
   });
+
+  logger.info(`Password changed successfully for ${user.email}`);
 
   return res
     .status(200)

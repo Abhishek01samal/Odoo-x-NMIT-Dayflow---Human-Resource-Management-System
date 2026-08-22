@@ -8,8 +8,9 @@ import { rateLimiter } from "./middlewares/rate-limit-middleware.js";
 import { userRouter } from "./routes/user.routes.js";
 import cors from "cors";
 import { ENV } from "./lib/env.js";
-import ApiError from "./utils/api-error.js";
+import { NotFoundError } from "./utils/api-error.js";
 import errorMiddleware from "./middlewares/error-middleware.js";
+import morganMiddleware from "./middlewares/morgan-middleware.js";
 
 const app = express();
 
@@ -22,6 +23,9 @@ app.use(
   })
 );
 app.options(/.*/, cors());
+
+app.use(morganMiddleware);
+
 app.use(express.json());
 app.use(cookieParser());
 app.set("trust proxy", 1);
@@ -33,7 +37,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 
 app.use((req, res, next) => {
-  next(new ApiError(404, "Route not found"));
+  next(new NotFoundError("Route not found"));
 });
 
 app.use(errorMiddleware);

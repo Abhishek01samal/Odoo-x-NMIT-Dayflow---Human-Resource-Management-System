@@ -12,6 +12,7 @@ import { accessTokenOptions, refreshTokenOptions } from "../utils/constants.js";
 import { github } from "../utils/github.js";
 import crypto from "crypto";
 import { ENV } from "../lib/env.js";
+import logger from "../lib/logger.js";
 import { sendOauthWelcomeMail } from "../utils/send-mails.js";
 
 /**
@@ -160,10 +161,12 @@ export const getGoogleLoginCallback = AsyncHandler(
       res.cookie("accessToken", accessToken, accessTokenOptions);
       res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 
+      logger.info(`Google OAuth login successful for ${user.email}`);
+
       //  Redirect to frontend dashboard
       return res.redirect(`${ENV.FRONTEND_URL}/dashboard`);
     } catch (error) {
-      console.log("Google OAuth Error:", error);
+      logger.error("Google OAuth Error:", error);
       return res.redirect(
         `${ENV.FRONTEND_URL}/sign-in?error=google_oauth_failed`
       );
@@ -328,9 +331,11 @@ export const getGithubLoginCallback = AsyncHandler(
       res.cookie("accessToken", loginAccessToken, accessTokenOptions);
       res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 
+      logger.info(`GitHub OAuth login successful for ${user.email}`);
+
       return res.redirect(`${ENV.FRONTEND_URL}/dashboard`);
     } catch (error) {
-      console.log("GitHub OAuth Error:", error);
+      logger.error("GitHub OAuth Error:", error);
       return res.redirect(
         `${ENV.FRONTEND_URL}/sign-in?error=github_oauth_failed`
       );

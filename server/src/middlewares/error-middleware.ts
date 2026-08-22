@@ -1,25 +1,34 @@
-import ApiError from "../utils/api-error.js";
+import logger from "../lib/logger.js";
+import ApiError, {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from "../utils/api-error.js";
 
-const errorMiddleware = (err: any, req: any, res: any, next: any) => {
+const errorMiddleware = (err: any, _req: any, res: any, _next: any) => {
   if (err instanceof ApiError) {
-    console.error("[ERROR]:", err);
+    logger.error(err.stack);
     return res.status(err.statusCode).json(err);
   }
 
   if (err?.name === "ZodError") {
-    return res
-      .status(400)
-      .json(new ApiError(400, err.issues?.[0]?.message ?? "Validation error"));
+    const zodError = new BadRequestError(
+      err.issues?.[0]?.message ?? "Validation error"
+    );
+    logger.error(zodError.stack);
+    return res.status(zodError.statusCode).json(zodError);
   }
 
   if (err?.name === "JsonWebTokenError" || err?.name === "TokenExpiredError") {
-    return res.status(401).json(new ApiError(401, "Unauthorized"));
+    const authError = new UnauthorizedError("Unauthorized");
+    logger.error(authError.stack);
+    return res.status(authError.statusCode).json(authError);
   }
 
-  console.error(err);
+  logger.error("[UNHANDLED_ERROR]: ", err.stack);
   return res
     .status(500)
-    .json(new ApiError(500, err?.message ?? "Internal Server Error"));
+    .json(new InternalServerError(err?.message ?? "Internal Server Error"));
 };
 
 export default errorMiddleware;

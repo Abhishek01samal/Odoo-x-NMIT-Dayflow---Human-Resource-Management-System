@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError, type ZodSchema } from "zod";
-import ApiError from "../utils/api-error.js";
+import { BadRequestError, InternalServerError } from "../utils/api-error.js";
 
 export function validateData(schema: ZodSchema) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -12,15 +12,15 @@ export function validateData(schema: ZodSchema) {
         const firstError = error.issues[0];
 
         if (!firstError) {
-          throw new ApiError(400, "Invalid request data");
+          throw new BadRequestError("Invalid request data");
         }
 
         const errorMessage = firstError.message;
 
-        throw new ApiError(400, errorMessage);
+        throw new BadRequestError(errorMessage);
       }
 
-      throw new ApiError(500, "Internal Server Error");
+      throw new InternalServerError("Internal Server Error");
     }
   };
 }

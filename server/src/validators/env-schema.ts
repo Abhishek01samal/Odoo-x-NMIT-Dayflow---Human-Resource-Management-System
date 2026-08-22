@@ -3,6 +3,8 @@ import { z } from "zod";
 const envSchema = z.object({
   NODE_ENV: z.enum(["DEVELOPMENT", "PRODUCTION"]),
   PORT: z.string().default("5000").transform(Number),
+  SERVICE_NAME: z.string(),
+  LOG_LEVEL: z.string().default("info"),
   FRONTEND_URL: z
     .string()
     .url()

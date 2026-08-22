@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import React, { useState } from "react";
+import { Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -169,12 +170,12 @@ const SignUp = () => {
 
                   <FieldDescription className="text-center text-sm">
                     Already have an account?{" "}
-                    <a
-                      href="/sign-in"
+                    <Link
+                      to="/sign-in"
                       className="font-medium underline underline-offset-4 hover:text-foreground transition-colors"
                     >
                       Sign in
-                    </a>
+                    </Link>
                   </FieldDescription>
                 </FieldGroup>
               </form>

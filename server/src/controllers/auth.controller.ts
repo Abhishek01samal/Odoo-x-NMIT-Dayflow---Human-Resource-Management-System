@@ -1,5 +1,6 @@
 import { comparePassword, hashPassword } from "../lib/bcrypt.js";
 import { ENV } from "../lib/env.js";
+import logger from "../lib/logger.js";
 import { prisma } from "../lib/prisma.js";
 import { redisClient } from "../lib/redis.js";
 import {
@@ -7,7 +8,11 @@ import {
   generateRefreshToken,
 } from "../middlewares/auth-middleware.js";
 import type { IPayload } from "../types/jwt.types.js";
-import ApiError from "../utils/api-error.js";
+import {
+  BadRequestError,
+  ConflictError,
+  UnauthorizedError,
+} from "../utils/api-error.js";
 import ApiResponse from "../utils/api-response.js";
 import AsyncHandler from "../utils/async-handler.js";
 import { accessTokenOptions, refreshTokenOptions } from "../utils/constants.js";
@@ -25,14 +30,16 @@ const registerUser = AsyncHandler(async (req: any, res: any) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
-    throw new ApiError(400, "All fields are required");
+    throw new BadRequestError("All fields are required");
   }
 
   // check if user already exists
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    throw new ApiError(400, "User already exists");
+    throw new ConflictError("User already exists");
   }
+
+  logger.info(`Registration attempt for ${email}`);
 
   //hash password
   const hashedPassword = await hashPassword(password);
@@ -103,11 +110,13 @@ const registerUser = AsyncHandler(async (req: any, res: any) => {
     10 * 60
   );
   const verifyLink = `${req.protocol}://${req.get("host")}/api/v1/auth/verify-email?id=${user.id}&verifyToken=${verificationToken}`;
-  // console.log(verifyLink);
 
   res.cookie("accessToken", accessToken, accessTokenOptions);
   res.cookie("refreshToken", refreshToken, refreshTokenOptions);
   sendRegistrationMail(name, email, verifyLink);
+
+  logger.info(`User registered successfully: ${email}`);
+
   return res.status(201).json(
     new ApiResponse(201, "User registered successfully", {
       accessToken,
@@ -127,8 +136,10 @@ const loginUser = AsyncHandler(async (req: any, res: any) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    throw new ApiError(400, "All fields are required");
+    throw new BadRequestError("All fields are required");
   }
+
+  logger.info(`Login attempt for ${email}`);
 
   //check user exists or not
   const user = await prisma.user.findUnique({
@@ -144,15 +155,17 @@ const loginUser = AsyncHandler(async (req: any, res: any) => {
     },
   });
   if (!user) {
-    throw new ApiError(401, "Invalid Credentials");
+    logger.warn(`Login attempt for non-existent user: ${email}`);
+    throw new UnauthorizedError("Invalid Credentials");
   }
   if (!user.password) {
-    throw new ApiError(400, "Please login with your OAuth provider");
+    throw new BadRequestError("Please login with your OAuth provider");
   }
   //compare password
   const isMatched = await comparePassword(password, user.password);
   if (!isMatched) {
-    throw new ApiError(401, "Invalid Credentials");
+    logger.warn(`Invalid password attempt for ${email}`);
+    throw new UnauthorizedError("Invalid Credentials");
   }
 
   //generate access & refresh tokens
@@ -193,6 +206,8 @@ const loginUser = AsyncHandler(async (req: any, res: any) => {
   res.cookie("accessToken", accessToken, accessTokenOptions);
   res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 
+  logger.info(`Login successful for ${email}`);
+
   return res.status(200).json(
     new ApiResponse(200, "Logged in successfully", {
       accessToken,
@@ -213,7 +228,7 @@ const logoutUser = AsyncHandler(async (req: any, res: any) => {
   const refreshToken = req?.cookies?.refreshToken;
   const storedRefreshToken = await redisClient.get(`refresh-token:${id}`);
   if (!refreshToken || refreshToken !== storedRefreshToken) {
-    throw new ApiError(401, "Unauthorized request");
+    throw new UnauthorizedError("Unauthorized request");
   }
 
   //black list refresh token
@@ -230,6 +245,8 @@ const logoutUser = AsyncHandler(async (req: any, res: any) => {
   res.clearCookie("accessToken", accessTokenOptions);
   res.clearCookie("refreshToken", refreshTokenOptions);
 
+  logger.info(`User logged out: ${id}`);
+
   return res.status(200).json(new ApiResponse(200, "Logged out successfully"));
 });
 
@@ -244,7 +261,8 @@ const verifyEmail = AsyncHandler(async (req: any, res: any) => {
   const storedVerifyToken = await redisClient.get(`verify-token:${id}`);
 
   if (verifyToken !== storedVerifyToken) {
-    throw new ApiError(400, "Email verification failed");
+    logger.warn(`Email verification failed for user id: ${id}`);
+    throw new BadRequestError("Email verification failed");
   }
 
   const user = await prisma.user.update({
@@ -253,6 +271,8 @@ const verifyEmail = AsyncHandler(async (req: any, res: any) => {
   });
 
   await redisClient.del(`verify-token:${user.id}`);
+
+  logger.info(`Email verified for ${user.email}`);
 
   return res.redirect(`${ENV.FRONTEND_URL}/dashboard`);
 });
@@ -266,7 +286,7 @@ const forgotPassword = AsyncHandler(async (req: any, res: any) => {
   const { email } = req.body;
 
   if (!email) {
-    throw new ApiError(400, "All fields are required");
+    throw new BadRequestError("All fields are required");
   }
 
   //if not existing user
@@ -277,6 +297,7 @@ const forgotPassword = AsyncHandler(async (req: any, res: any) => {
   });
 
   if (!isExistingUser) {
+    logger.warn(`Password reset requested for non-existent email: ${email}`);
     return res
       .status(200)
       .json(
@@ -289,6 +310,8 @@ const forgotPassword = AsyncHandler(async (req: any, res: any) => {
 
   await redisClient.set(`verify-otp:${email}`, otp.toString(), "EX", 10 * 60);
   sendOtpMail(email, otp.toString());
+
+  logger.info(`Password reset OTP sent to ${email}`);
 
   return res
     .status(200)
@@ -306,7 +329,7 @@ const resetPassword = AsyncHandler(async (req: any, res: any) => {
   const { email, otp, newPassword } = req.body;
 
   if (!email || !otp || !newPassword) {
-    throw new ApiError(400, "All fields are required");
+    throw new BadRequestError("All fields are required");
   }
   //if not existing user
   const isExistingUser = await prisma.user.findUnique({
@@ -319,7 +342,8 @@ const resetPassword = AsyncHandler(async (req: any, res: any) => {
 
   if (!isExistingUser || !storedOtp || otp !== storedOtp) {
     await redisClient.del(`verify-otp:${email}`);
-    throw new ApiError(400, "Invalid email or OTP");
+    logger.warn(`Invalid OTP or email during password reset for ${email}`);
+    throw new BadRequestError("Invalid email or OTP");
   }
 
   //hash new password
@@ -331,6 +355,8 @@ const resetPassword = AsyncHandler(async (req: any, res: any) => {
   });
 
   await redisClient.del(`verify-otp:${email}`);
+
+  logger.info(`Password reset successfully for ${email}`);
 
   return res
     .status(200)
@@ -349,13 +375,13 @@ const refreshAccessToken = AsyncHandler(async (req: any, res: any) => {
       req?.cookies?.refreshToken || authorization?.split(" ")[1];
 
     if (!refreshToken) {
-      throw new ApiError(401, "Unauthorized request");
+      throw new UnauthorizedError("Unauthorized request");
     }
     const blacklisted = await redisClient.get(
       `blackList-token:${refreshToken}`
     );
     if (blacklisted === "BLOCKED") {
-      throw new ApiError(401, "Unauthorized request");
+      throw new UnauthorizedError("Unauthorized request");
     }
     const decoded = jwt.verify(
       refreshToken,
@@ -366,13 +392,12 @@ const refreshAccessToken = AsyncHandler(async (req: any, res: any) => {
     const storedRefreshToken = await redisClient.get(`refresh-token:${id}`);
 
     if (!storedRefreshToken || storedRefreshToken !== refreshToken) {
-      throw new ApiError(401, "Session expired. Please login again.");
+      throw new UnauthorizedError("Session expired. Please login again.");
     }
 
     const activeSessionId = await redisClient.get(`active-session:${id}`);
     if (!activeSessionId || activeSessionId !== sessionId) {
-      throw new ApiError(
-        401,
+      throw new UnauthorizedError(
         "Session expired. You logged in from another device."
       );
     }
@@ -386,6 +411,9 @@ const refreshAccessToken = AsyncHandler(async (req: any, res: any) => {
     );
 
     res.cookie("accessToken", accessToken, accessTokenOptions);
+
+    logger.info(`Access token refreshed for ${email}`);
+
     return res.status(200).json(
       new ApiResponse(200, "Access token refreshed successfully", {
         accessToken,
@@ -393,9 +421,9 @@ const refreshAccessToken = AsyncHandler(async (req: any, res: any) => {
     );
   } catch (error: any) {
     if (error.name === "TokenExpiredError") {
-      throw new ApiError(401, "Session expired, Please login again");
+      throw new UnauthorizedError("Session expired, Please login again");
     }
-    throw new ApiError(401, "Unauthorized request");
+    throw new UnauthorizedError("Unauthorized request");
   }
 });
 

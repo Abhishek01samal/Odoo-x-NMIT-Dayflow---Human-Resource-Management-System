@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { ENV } from "./env.js";
+import logger from "./logger.js";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -15,9 +16,9 @@ const transporter = nodemailer.createTransport({
 const connectToTransporter = async () => {
   try {
     await transporter.verify();
-    console.log("Transporter connected successfully...");
+    logger.info("Transporter connected successfully...");
   } catch (err) {
-    console.error("Failed to connect to transporter:", err);
+    logger.error("Failed to connect to transporter:", err);
   }
 };
 

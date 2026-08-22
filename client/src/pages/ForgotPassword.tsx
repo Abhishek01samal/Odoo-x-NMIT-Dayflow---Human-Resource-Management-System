@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import React, { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import apiInstance from "@/services/auth.api";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import toast from "react-hot-toast";
 
 const ForgotPassword = () => {
@@ -78,12 +78,12 @@ const ForgotPassword = () => {
 
                   <div className="text-center text-sm">
                     Remember your password?{" "}
-                    <a
-                      href="/sign-in"
+                    <Link
+                      to="/sign-in"
                       className="font-medium underline underline-offset-4 hover:text-foreground transition-colors"
                     >
                       Sign in
-                    </a>
+                    </Link>
                   </div>
                 </FieldGroup>
               </form>

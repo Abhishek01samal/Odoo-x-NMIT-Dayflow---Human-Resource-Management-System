@@ -16,6 +16,7 @@ import { FaGithub } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import { Spinner } from "@/components/ui/spinner";
 import { useNavigate } from "react-router";
+import { Link } from "react-router";
 
 const SignIn = () => {
   const [email, setEmail] = useState<string>("");
@@ -85,6 +86,7 @@ const SignIn = () => {
                         Password
                       </FieldLabel>
                       <button
+                        type="button"
                         className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground transition-colors cursor-pointer"
                         onClick={() => {
                           navigate("/forgot-password");
@@ -159,12 +161,12 @@ const SignIn = () => {
 
                   <FieldDescription className="text-center text-sm">
                     Don&apos;t have an account?{" "}
-                    <a
-                      href="/sign-up"
+                    <Link
+                      to="/sign-up"
                       className="font-medium underline underline-offset-4 hover:text-foreground transition-colors"
                     >
                       Sign up
-                    </a>
+                    </Link>
                   </FieldDescription>
                 </FieldGroup>
               </form>

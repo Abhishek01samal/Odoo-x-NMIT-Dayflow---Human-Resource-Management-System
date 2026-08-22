@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import logger from "./logger.js";
 
 const connectionString = `${process.env.DATABASE_URL}`;
 
@@ -10,9 +11,9 @@ const prisma = new PrismaClient({ adapter });
 const connectToDB = async () => {
   try {
     await prisma.$connect();
-    console.log("Database connected successfully...");
+    logger.info("Database connected successfully...");
   } catch (error) {
-    console.error("Failed to connect to database:", error);
+    logger.error("Failed to connect to database:", error);
     process.exit(1);
   }
 };

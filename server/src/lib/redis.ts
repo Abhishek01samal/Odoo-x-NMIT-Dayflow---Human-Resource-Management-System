@@ -1,5 +1,6 @@
 import { Redis } from "ioredis";
 import { ENV } from "./env.js";
+import logger from "./logger.js";
 
 const client = new Redis(ENV.REDIS_URL);
 //const client = new Redis(ENV.REDIS_URL,{tls:{}}); for prod env
@@ -10,9 +11,9 @@ if (!client) {
 
 const connectToRedis = async () => {
   await client.ping();
-  console.log("Redis connected successfully...");
+  logger.info("Redis connected successfully...");
   client.on("error", (err: any) => {
-    console.error("❌❌ Redis connection error: ", err);
+    logger.error("❌❌ Redis connection error: ", err);
   });
 };
 
