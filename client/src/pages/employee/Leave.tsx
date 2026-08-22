@@ -1,18 +1,13 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import {
-  CalendarDays,
-  ChevronLeft,
-  Clock3,
-  HeartPulse,
-  Wallet,
-} from "lucide-react";
-import { StatCard, TONES } from "@/components/shared/StatCard";
-import { LoadingButton } from "@/components/shared/LoadingButton";
-import { EmptyState } from "@/components/shared/EmptyState";
+import { CalendarPlus, CircleCheck, CircleX, Clock3 } from "lucide-react";
+import toast from "react-hot-toast";
+import { useLeaves } from "@/hooks/useLeaves";
+import { ApplyLeaveDialog } from "@/components/employee/ApplyLeaveDialog";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { DataTable, type DataTableColumn } from "@/components/shared/DataTable";
 import { ErrorState } from "@/components/shared/ErrorState";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,204 +15,254 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import type { LeaveStatus, LeaveType } from "@/types/leave";
-import { useLeave } from "@/hooks/useLeave";
+import type { LeaveRequest, LeaveStatus, LeaveType } from "@/types";
 
-const STATUS_TONE: Record<LeaveStatus, string> = {
-  PENDING: TONES.warning,
-  APPROVED: TONES.success,
-  REJECTED: TONES.danger,
+const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
+  PENDING:
+    "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30",
+  APPROVED:
+    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30",
+  REJECTED: "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30",
 };
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const TYPE_LABEL: Record<LeaveType, string> = {
+  PAID: "Paid",
+  SICK: "Sick",
+  UNPAID: "Unpaid",
+};
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+function BalanceCard({
+  title,
+  used,
+  total,
+}: {
+  title: string;
+  used: number;
+  total?: number;
+}) {
+  const pct =
+    total && total > 0 ? Math.min(100, Math.round((used / total) * 100)) : null;
+  return (
+    <div className="rounded-xl border p-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </p>
+      <p className="mt-1.5 text-2xl font-bold tabular-nums">
+        {total != null ? (
+          <>
+            {total - used}
+            <span className="text-sm font-normal text-muted-foreground">
+              {" "}
+              / {total} left
+            </span>
+          </>
+        ) : (
+          <>
+            {used}
+            <span className="text-sm font-normal text-muted-foreground">
+              {" "}
+              used
+            </span>
+          </>
+        )}
+      </p>
+      {pct != null && (
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function EmployeeLeave() {
-  const { leaves, balance, isLoading, error, isApplying, refetch, applyLeave } =
-    useLeave();
+  const { leaves, balances, isLoading, error, refetch, apply, cancel } =
+    useLeaves();
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
-  const [type, setType] = useState<LeaveType>("PAID");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [reason, setReason] = useState("");
+  if (error)
+    return (
+      <ErrorState
+        title="Couldn't load leave data"
+        description={error}
+        onRetry={refetch}
+      />
+    );
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!startDate || !endDate || !reason.trim()) return;
-    const ok = await applyLeave({
-      type,
-      startDate: new Date(startDate).toISOString(),
-      endDate: new Date(endDate).toISOString(),
-      reason: reason.trim(),
-    });
-    if (ok) {
-      setStartDate("");
-      setEndDate("");
-      setReason("");
+  const handleApply = async (payload: Parameters<typeof apply>[0]) => {
+    setSubmitting(true);
+    try {
+      await apply(payload);
+      toast.success("Leave request submitted");
+      setApplyOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to apply");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (error) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-10">
-        <ErrorState description={error} onRetry={refetch} />
-      </div>
-    );
-  }
+  const handleCancel = async () => {
+    if (!cancelTarget) return;
+    setCancelLoading(true);
+    try {
+      await cancel(cancelTarget.id);
+      toast.success("Pending request cancelled");
+      setCancelTarget(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to cancel");
+    } finally {
+      setCancelLoading(false);
+    }
+  };
 
-  const paidRemaining = balance ? balance.paidTotal - balance.paidUsed : null;
-  const sickRemaining = balance ? balance.sickTotal - balance.sickUsed : null;
+  const columns: DataTableColumn<LeaveRequest>[] = [
+    {
+      key: "type",
+      header: "Type",
+      sortable: true,
+      render: (l) => <Badge variant="secondary">{TYPE_LABEL[l.type]}</Badge>,
+    },
+    {
+      key: "startDate",
+      header: "Dates",
+      render: (l) => (
+        <span className="tabular-nums">
+          {fmtDate(l.startDate)}
+          {l.endDate !== l.startDate && ` → ${fmtDate(l.endDate)}`}
+        </span>
+      ),
+    },
+    { key: "days", header: "Days", sortable: true },
+    {
+      key: "reason",
+      header: "Reason",
+      render: (l) => (
+        <span className="block max-w-[220px] truncate" title={l.reason}>
+          {l.reason}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (l) => (
+        <Badge variant="outline" className={`${LEAVE_STATUS_STYLE[l.status]} border`}>
+          {l.status === "PENDING" ? (
+            <Clock3 className="size-3" />
+          ) : l.status === "APPROVED" ? (
+            <CircleCheck className="size-3" />
+          ) : (
+            <CircleX className="size-3" />
+          )}
+          {l.status.charAt(0) + l.status.slice(1).toLowerCase()}
+        </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (l) =>
+        l.status === "PENDING" ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-destructive hover:text-destructive"
+            onClick={() => setCancelTarget(l)}
+          >
+            Cancel
+          </Button>
+        ) : l.reviewComment ? (
+          <span
+            className="block max-w-[160px] truncate text-xs text-muted-foreground italic"
+            title={l.reviewComment ?? ""}
+          >
+            “{l.reviewComment}”
+          </span>
+        ) : null,
+    },
+  ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:py-10">
-      <div className="mb-6 flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/employee/dashboard">
-            <ChevronLeft className="size-4" />
-          </Link>
-        </Button>
+    <div className="space-y-6 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Leave & Time-Off</h1>
+          <h1 className="text-2xl font-bold tracking-tight">My Leave</h1>
           <p className="text-sm text-muted-foreground">
-            Apply for leave and track your requests
+            Balances, requests and history
           </p>
         </div>
+        <Button className="gap-1.5" onClick={() => setApplyOpen(true)}>
+          <CalendarPlus className="size-4" />
+          Apply for Leave
+        </Button>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard
-          title="Paid leave left"
-          value={paidRemaining ?? "—"}
-          icon={Wallet}
-          iconClassName={TONES.info}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <BalanceCard
+          title="Paid Leave"
+          used={balances?.paidUsed ?? 0}
+          total={balances?.paidTotal}
         />
-        <StatCard
-          title="Sick leave left"
-          value={sickRemaining ?? "—"}
-          icon={HeartPulse}
-          iconClassName={TONES.success}
+        <BalanceCard
+          title="Sick Leave"
+          used={balances?.sickUsed ?? 0}
+          total={balances?.sickTotal}
         />
-        <StatCard
-          title="Unpaid taken"
-          value={balance?.unpaidUsed ?? "—"}
-          icon={Clock3}
-          iconClassName={TONES.default}
-        />
+        <BalanceCard title="Unpaid Leave" used={balances?.unpaidUsed ?? 0} />
       </div>
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Apply for leave</CardTitle>
-          <CardDescription>Select a leave type, date range, and add a reason</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="leave-type">Leave type</FieldLabel>
-                <div className="flex gap-2">
-                  {(["PAID", "SICK", "UNPAID"] as LeaveType[]).map((t) => (
-                    <Button
-                      key={t}
-                      type="button"
-                      variant={type === t ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setType(t)}
-                    >
-                      {t.charAt(0) + t.slice(1).toLowerCase()}
-                    </Button>
-                  ))}
-                </div>
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel htmlFor="startDate">Start date</FieldLabel>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="endDate">End date</FieldLabel>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <Field>
-                <FieldLabel htmlFor="reason">Reason</FieldLabel>
-                <Input
-                  id="reason"
-                  placeholder="Briefly describe why you need this leave"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  required
-                />
-              </Field>
-
-              <LoadingButton type="submit" loading={isApplying} loadingText="Submitting...">
-                Submit request
-              </LoadingButton>
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Your requests</CardTitle>
-          <CardDescription>History of leave applications</CardDescription>
+          <CardTitle>My Requests</CardTitle>
+          <CardDescription>Newest first · cancel pending anytime</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          ) : leaves.length === 0 ? (
-            <EmptyState
-              icon={CalendarDays}
-              title="No leave requests yet"
-              description="Once you apply for leave, it'll show up here."
-            />
-          ) : (
-            <div className="space-y-3">
-              {leaves.map((lr) => (
-                <div
-                  key={lr.id}
-                  className="flex items-start justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {lr.type.charAt(0) + lr.type.slice(1).toLowerCase()} Leave
-                      </span>
-                      <Badge className={STATUS_TONE[lr.status]}>{lr.status}</Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(lr.startDate)} – {formatDate(lr.endDate)} · {lr.days} day(s)
-                    </p>
-                    <p className="mt-1 text-sm">{lr.reason}</p>
-                    {lr.reviewComment && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        HR comment: {lr.reviewComment}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={leaves}
+            isLoading={isLoading}
+            searchKeys={["type", "reason", "status"]}
+            emptyMessage="No leave requests yet — apply for your first one!"
+          />
         </CardContent>
       </Card>
+
+      <ApplyLeaveDialog
+        open={applyOpen}
+        onOpenChange={setApplyOpen}
+        submitting={submitting}
+        onSubmit={handleApply}
+      />
+
+      <ConfirmDialog
+        open={cancelTarget !== null}
+        onOpenChange={(o) => !o && setCancelTarget(null)}
+        title="Cancel this leave request?"
+        description={
+          cancelTarget
+            ? `${TYPE_LABEL[cancelTarget.type]} · ${fmtDate(cancelTarget.startDate)} (${cancelTarget.days}d)`
+            : undefined
+        }
+        confirmLabel="Yes, cancel it"
+        destructive
+        loading={cancelLoading}
+        onConfirm={handleCancel}
+      />
     </div>
   );
 }

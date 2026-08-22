@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { getApiErrorMessage } from "@/lib/apiError";
 import { useAuth } from "@/hooks/useAuth";
 import { dashboardApi } from "@/services/dashboard.api";
 import type {
@@ -24,8 +25,8 @@ export const useDashboard = () => {
       setStats(data.stats);
       setToday(data.today);
       setRecentActivity(data.recentActivity);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to load dashboard");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load dashboard"));
     } finally {
       setIsLoading(false);
     }
@@ -44,8 +45,8 @@ export const useDashboard = () => {
           `Checked in at ${new Date(updated.checkInTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
         );
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Check-in failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Check-in failed"));
     }
   };
 
@@ -54,8 +55,8 @@ export const useDashboard = () => {
       const updated = await dashboardApi.checkOut();
       setToday(updated);
       toast.success(`Checked out · ${updated.workedHours}h logged today`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Check-out failed");
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, "Check-out failed"));
     }
   };
 

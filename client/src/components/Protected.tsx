@@ -17,14 +17,18 @@ const DEMO_USER = {
   updatedAt: new Date().toISOString(),
 };
 
-const Protected = () => {
+type ProtectedProps = {
+  allowedRoles?: string[];
+};
+
+const Protected = ({ allowedRoles }: ProtectedProps) => {
   const { user, setUser, isInitialized } = useAuthContext();
 
   useEffect(() => {
     if (DEMO_MODE && isInitialized && !user) {
       setUser(DEMO_USER);
     }
-  }, [DEMO_MODE, isInitialized, user, setUser]);
+  }, [isInitialized, user, setUser]);
 
   // Don't render until initialization is complete
   if (!isInitialized) {
@@ -34,6 +38,16 @@ const Protected = () => {
   // If user is not authenticated after initialization, redirect to sign-in
   if (!user) {
     return <Navigate to={"/sign-in"} replace />;
+  }
+
+  // Role gate — demo mode sees everything for preview purposes
+  if (
+    !DEMO_MODE &&
+    allowedRoles &&
+    allowedRoles.length > 0 &&
+    !allowedRoles.includes(user.role)
+  ) {
+    return <Navigate to={"/employee/dashboard"} replace />;
   }
 
   // User is authenticated, render protected routes

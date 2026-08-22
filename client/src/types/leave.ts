@@ -4,34 +4,23 @@ export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED";
 export interface LeaveRequest {
   id: string;
   userId: string;
+  employeeName?: string;
+  department?: string;
   type: LeaveType;
   startDate: string;
   endDate: string;
   days: number;
   reason: string;
   status: LeaveStatus;
-  reviewComment: string | null;
-  reviewedAt: string | null;
-  reviewedById: string | null;
+  reviewComment?: string | null;
+  reviewedBy?: string | null;
   createdAt: string;
-  updatedAt: string;
-  user?: { id: string; name: string; email: string };
 }
 
-export interface LeaveBalance {
-  id: string;
-  userId: string;
-  year: number;
+export interface LeaveBalanceSummary {
   paidTotal: number;
   paidUsed: number;
   sickTotal: number;
   sickUsed: number;
   unpaidUsed: number;
-}
-
-export interface ApplyLeavePayload {
-  type: LeaveType;
-  startDate: string;
-  endDate: string;
-  reason: string;
 }

@@ -1,46 +1,44 @@
-import type { LeaveRequest } from "./leave";
+export type SystemRole = "EMPLOYEE" | "HR" | "ADMIN";
 
-export interface AdminDashboardData {
-  totalEmployees: number;
-  activeEmployees: number;
-  attendanceToday: {
-    present: number;
-    absent: number;
-    halfDay: number;
-    leave: number;
-    notMarked: number;
-  };
-  pendingLeaves: number;
-  recentPendingLeaves: LeaveRequest[];
-  draftPayrollCount: number;
-}
-
-export interface EmployeeSummary {
+export interface AdminUser {
   id: string;
   name: string;
   email: string;
-  role: "EMPLOYEE" | "HR" | "ADMIN";
+  role: SystemRole;
   isActive: boolean;
   isVerified: boolean;
   createdAt: string;
-  profile: {
-    id: string;
-    employeeId: string;
-    department: string;
-    designation: string;
-    phone: string | null;
-    joinedAt: string;
-  } | null;
 }
 
-export interface AttendanceRecord {
-  id: string;
+export interface EmployeeListItem {
   userId: string;
-  date: string;
-  checkInAt: string | null;
-  checkOutAt: string | null;
-  workedHours: number | null;
-  status: "PRESENT" | "ABSENT" | "HALF_DAY" | "LEAVE";
-  note: string | null;
-  user?: { id: string; name: string; email: string };
+  name: string;
+  email: string;
+  employeeId: string;
+  department: string;
+  designation: string;
+  phone: string;
+  joinedAt: string;
+  isActive: boolean;
+}
+
+export interface Department {
+  id: string;
+  name: string;
+  headCount: number;
+}
+
+export interface Designation {
+  id: string;
+  name: string;
+  level: string;
+}
+
+export interface HrDashboardData {
+  totalEmployees: number;
+  activeToday: number;
+  onLeaveToday: number;
+  pendingLeaveRequests: number;
+  monthlyPayrollCost: number;
+  attendanceTrend: { date: string; presentRate: number }[];
 }

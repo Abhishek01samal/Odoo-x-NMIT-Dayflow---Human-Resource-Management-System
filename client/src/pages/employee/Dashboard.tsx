@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import {
   BadgeIndianRupee,
@@ -98,6 +98,13 @@ export default function EmployeeDashboard() {
   } = useDashboard();
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (today?.status !== "CHECKED_IN") return;
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [today?.status]);
 
   if (isLoading) return <DashboardSkeleton />;
   if (error)
@@ -123,14 +130,16 @@ export default function EmployeeDashboard() {
   };
 
   const liveHours =
-    today.status === "CHECKED_IN" && today.checkInTime
+    today && today.status === "CHECKED_IN" && today.checkInTime
       ? Math.max(
           0,
           Number(
-            ((Date.now() - new Date(today.checkInTime).getTime()) / 3_600_000).toFixed(1)
+            ((now - new Date(today.checkInTime).getTime()) / 3_600_000).toFixed(
+              1
+            )
           )
         )
-      : today.workedHours;
+      : (today?.workedHours ?? 0);
 
   const firstName = user?.name?.split(" ")[0] ?? "there";
 

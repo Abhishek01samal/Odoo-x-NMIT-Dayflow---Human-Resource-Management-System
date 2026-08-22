@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { getApiErrorMessage } from "@/lib/apiError";
 import { profileApi } from "@/services/profile.api";
 import type { EmployeeProfile } from "@/types";
 
@@ -14,8 +15,8 @@ export const useProfile = () => {
       setError(null);
       const data = await profileApi.getMyProfile();
       setProfile(data);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to load profile");
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, "Failed to load profile"));
     } finally {
       setIsLoading(false);
     }
@@ -32,9 +33,9 @@ export const useProfile = () => {
         setProfile(updated);
         toast.success("Profile updated successfully");
         return true;
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast.error(
-          err?.response?.data?.message || "Failed to update profile"
+          getApiErrorMessage(err, "Failed to update profile")
         );
         return false;
       }
