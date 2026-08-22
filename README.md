@@ -1,1 +1,1 @@
-
+The goal of Dayflow is to provide a centralized, secure, and easy-to-use HR platform where employees can manage their attendance and leave while HR/Admin can manage employees and organizational operations.
