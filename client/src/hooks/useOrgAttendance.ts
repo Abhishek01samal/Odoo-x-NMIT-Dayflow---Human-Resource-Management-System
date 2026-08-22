@@ -62,3 +62,5 @@ function computeHours(checkIn: string | null, checkOut: string | null): number {
   if (Number.isNaN(diff) || diff <= 0) return 0;
   return Math.round((diff / 3_600_000) * 10) / 10;
 }
+
+

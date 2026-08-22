@@ -48,3 +48,5 @@ export const DESIGNATIONS_MOCK: Designation[] = [
   { id: "g-5", name: "Manager", level: "M1" },
   { id: "g-6", name: "Senior Manager", level: "M2" },
 ];
+
+

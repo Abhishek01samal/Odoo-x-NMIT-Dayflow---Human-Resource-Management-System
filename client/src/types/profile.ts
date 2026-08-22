@@ -15,3 +15,5 @@ export interface EmployeeProfile {
   bankAccountNo: string;
   ifscCode: string;
 }
+
+

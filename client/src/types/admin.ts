@@ -42,3 +42,5 @@ export interface HrDashboardData {
   monthlyPayrollCost: number;
   attendanceTrend: { date: string; presentRate: number }[];
 }
+
+

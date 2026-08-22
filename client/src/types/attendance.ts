@@ -24,3 +24,5 @@ export interface OrgAttendanceTrendPoint {
   date: string;
   presentRate: number;
 }
+
+

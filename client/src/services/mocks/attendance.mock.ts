@@ -99,3 +99,5 @@ export const attendanceMock = {
     throw new Error("Record not found");
   },
 };
+
+

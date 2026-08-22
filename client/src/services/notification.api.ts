@@ -19,3 +19,5 @@ export const notificationApi = {
     await api.patch("/notifications/read-all");
   },
 };
+
+

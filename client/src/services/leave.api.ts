@@ -52,3 +52,5 @@ export const leaveApi = {
     return res.data?.data;
   },
 };
+
+

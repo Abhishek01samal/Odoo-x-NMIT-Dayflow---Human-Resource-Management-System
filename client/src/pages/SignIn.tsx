@@ -9,23 +9,26 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import React, { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthContext } from "@/context/AuthContext";
 import { Spinner } from "@/components/ui/spinner";
-import { useNavigate } from "react-router";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
+import toast from "react-hot-toast";
 
 const DEMO_ACCOUNTS = [
-  { label: "Admin", email: "admin@dayflow.io", password: "Admin@123" },
-  { label: "HR", email: "hr@dayflow.io", password: "Hr@12345" },
-  {
-    label: "Employee",
-    email: "employee@dayflow.io",
-    password: "Employee@123",
-  },
+  { label: "Admin", email: "admin@dayflow.io", password: "Admin@123", role: "ADMIN" },
+  { label: "HR", email: "hr@dayflow.io", password: "Hr@12345", role: "HR" },
+  { label: "Employee", email: "employee@dayflow.io", password: "Employee@123", role: "EMPLOYEE" },
 ];
 
 const REMEMBER_KEY = "dayflow.rememberEmail";
+
+const homeFor = (role?: string) => {
+  if (role === "ADMIN") return "/admin/dashboard";
+  if (role === "HR") return "/hr/dashboard";
+  return "/employee/dashboard";
+};
 
 const SignIn = () => {
   const [email, setEmail] = useState<string>(
@@ -36,12 +39,25 @@ const SignIn = () => {
   const [remember, setRemember] = useState<boolean>(
     () => !!localStorage.getItem(REMEMBER_KEY)
   );
-  const navigate = useNavigate();
   const { isLoading, login } = useAuth();
+  const { setUser, setIsInitialized } = useAuthContext();
+  const navigate = useNavigate();
 
-  const fillDemoAccount = (account: (typeof DEMO_ACCOUNTS)[number]) => {
-    setEmail(account.email);
-    setPassword(account.password);
+  // DEV MODE: Force login without backend — sets mock user directly
+  const forceLogin = (account: (typeof DEMO_ACCOUNTS)[number]) => {
+    const mockUser = {
+      id: `mock-${account.role.toLowerCase()}-001`,
+      name: `Demo ${account.label}`,
+      email: account.email,
+      role: account.role,
+      isVerified: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setUser(mockUser);
+    setIsInitialized(true);
+    toast.success(`Logged in as ${account.label} (Dev Mode)`);
+    navigate(homeFor(account.role));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -55,7 +71,11 @@ const SignIn = () => {
   };
 
   if (isLoading) {
-    return <Spinner />;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Spinner size="xl" />
+      </div>
+    );
   }
 
   return (
@@ -90,14 +110,7 @@ const SignIn = () => {
                       disabled={isLoading}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         setEmail(e.target.value);
-                      }}
-                      onInvalid={(e: React.InvalidEvent<HTMLInputElement>) => {
-                        (e.target as HTMLInputElement).setCustomValidity(
-                          "Enter Valid E-Mail ID"
-                        );
-                      }}
-                      onInput={(e: React.FormEvent<HTMLInputElement>) => {
-                        (e.target as HTMLInputElement).setCustomValidity("");
+                        e.target.setCustomValidity("");
                       }}
                     />
                   </Field>
@@ -105,18 +118,13 @@ const SignIn = () => {
                   {/* Password */}
                   <Field>
                     <div className="flex items-center justify-between">
-                      <FieldLabel htmlFor="signin-password">
-                        Password
-                      </FieldLabel>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground transition-colors cursor-pointer"
-                        onClick={() => {
-                          navigate("/forgot-password");
-                        }}
+                      <FieldLabel htmlFor="signin-password">Password</FieldLabel>
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground transition-colors"
                       >
                         Forgot password?
-                      </button>
+                      </Link>
                     </div>
                     <div className="relative">
                       <Input
@@ -135,11 +143,9 @@ const SignIn = () => {
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
+                        aria-label={showPassword ? "Hide password" : "Show password"}
                       >
-                        {showPassword ? <EyeOff /> : <Eye />}
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                       </button>
                     </div>
                   </Field>
@@ -157,61 +163,29 @@ const SignIn = () => {
 
                   {/* Submit */}
                   <Field>
-                    <Button type="submit" className="w-full cursor-pointer">
-                      {isLoading ? "Signing in..." : " Sign In"}
+                    <Button type="submit" className="w-full cursor-pointer" disabled={isLoading}>
+                      {isLoading ? "Signing in..." : "Sign In"}
                     </Button>
                   </Field>
 
-                  {/* Demo accounts — one-click fill */}
-                  <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
-                      Demo accounts — click to fill
+                  {/* DEV MODE: Force login without backend */}
+                  <div className="rounded-lg border border-dashed border-amber-500/60 bg-amber-500/5 p-3 space-y-2">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-amber-600 flex items-center gap-1">
+                      <Zap className="size-3" /> Dev Mode — bypass backend
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       {DEMO_ACCOUNTS.map((account) => (
                         <button
-                          key={account.email}
+                          key={`force-${account.email}`}
                           type="button"
-                          disabled={isLoading}
-                          onClick={() => fillDemoAccount(account)}
-                          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                          onClick={() => forceLogin(account)}
+                          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 transition-colors"
                         >
                           {account.label}
                         </button>
                       ))}
                     </div>
                   </div>
-
-                  {/* Divider */}
-                  {/* <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                    or continue with
-                  </FieldSeparator> */}
-
-                  {/* Socials — bottom */}
-                  {/* <Field className="grid grid-cols-2 gap-3">
-                    <Button
-                      variant="outline"
-                      type="button"
-                      className="h-10 gap-2 font-medium"
-                      onClick={() => {
-                        window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/google`;
-                      }}
-                    >
-                      <FcGoogle />
-                      Google
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      className="h-10 gap-2 font-medium"
-                      onClick={() => {
-                        window.location.href = `${import.meta.env.VITE_BACKEND_URL}/auth/github`;
-                      }}
-                    >
-                      <FaGithub />
-                      GitHub
-                    </Button>
-                  </Field> */}
 
                   <FieldDescription className="text-center text-sm">
                     Don&apos;t have an account?{" "}
@@ -231,15 +205,25 @@ const SignIn = () => {
                   src="/signin-bg.png"
                   alt="Sign in visual"
                   className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
                 />
-                <div className="absolute inset-0 bg-black/30 flex flex-col justify-end p-8">
-                  <p className="text-white text-lg font-semibold leading-snug">
-                    Secure by design.
-                    <br />
-                    <span className="text-white/70 text-sm font-normal">
-                      JWT · Redis · RBAC
-                    </span>
-                  </p>
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col justify-end p-8">
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/80">JWT</span>
+                      <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/80">Redis</span>
+                      <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-medium text-white/80">RBAC</span>
+                    </div>
+                    <p className="text-white text-lg font-semibold leading-snug">
+                      Secure by design.
+                      <br />
+                      <span className="text-white/70 text-sm font-normal">
+                        Enterprise-grade authentication for your workforce.
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -247,17 +231,11 @@ const SignIn = () => {
 
           <FieldDescription className="px-6 text-center text-xs text-muted-foreground">
             By clicking continue, you agree to our{" "}
-            <a
-              href="#"
-              className="underline underline-offset-4 hover:text-foreground transition-colors"
-            >
+            <a href="#" className="underline underline-offset-4 hover:text-foreground transition-colors">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a
-              href="#"
-              className="underline underline-offset-4 hover:text-foreground transition-colors"
-            >
+            <a href="#" className="underline underline-offset-4 hover:text-foreground transition-colors">
               Privacy Policy
             </a>
             .

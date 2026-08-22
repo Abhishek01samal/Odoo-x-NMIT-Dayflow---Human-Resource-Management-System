@@ -31,3 +31,5 @@ export interface EmployeeDashboardData {
   today: TodayAttendance;
   recentActivity: ActivityItem[];
 }
+
+

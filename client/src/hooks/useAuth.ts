@@ -1,4 +1,4 @@
-import { useAuthContext } from "@/context/AuthContext";
+import { useAuthContext, type User } from "@/context/AuthContext";
 import apiInstance from "@/services/api";
 import {
   loginRequest,
@@ -7,7 +7,41 @@ import {
   getProfileRequest,
 } from "@/services/auth.api";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router";
+
+// Guarantee every user entering the context has the fields the UI renders —
+// a malformed backend/HMR payload must never crash a page again.
+const sanitizeUser = (raw: unknown): User | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const u = raw as Partial<User> & Record<string, unknown>;
+  if (!u.email && !u.name) return null;
+  const name =
+    typeof u.name === "string" && u.name.trim()
+      ? u.name
+      : typeof u.email === "string"
+        ? u.email.split("@")[0]
+        : "User";
+  if (!(u.name && u.id)) {
+    console.warn("[Dayflow] sanitized malformed user object:", raw);
+  }
+  return {
+    id: typeof u.id === "string" ? u.id : `usr-${Date.now()}`,
+    name,
+    email: typeof u.email === "string" ? u.email : "",
+    role: typeof u.role === "string" ? u.role : "EMPLOYEE",
+    isVerified: u.isVerified ?? true,
+    createdAt:
+      typeof u.createdAt === "string"
+        ? u.createdAt
+        : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+};
+
+// Extract a friendly message from an unknown error (axios or mock)
+const errMessage = (error: unknown, fallback: string): string => {
+  const e = error as { response?: { data?: { message?: string } } };
+  return e?.response?.data?.message ?? fallback;
+};
 
 export const useAuth = () => {
   const {
@@ -30,7 +64,6 @@ export const useAuth = () => {
     password: string;
   };
 
-  const navigate = useNavigate();
 
   // Role-based landing route — decided by the account's role, never by the user
   const dashboardRouteFor = (role?: string) => {
@@ -43,12 +76,14 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       const res = await registerRequest({ name, email, password });
-      const user = res?.data?.user;
-      toast.success(res?.message || "Register successfully");
-      setUser(user);
-      navigate(dashboardRouteFor(user?.role));
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Register failed");
+      const rawUser = res?.data?.user;
+      const safeUser = sanitizeUser(rawUser);
+      toast.success(res?.message || "Registered successfully");
+      setUser(safeUser);
+      // Use replace so the router re-evaluates after user state is committed
+      window.location.replace(dashboardRouteFor(rawUser?.role));
+    } catch (error) {
+      toast.error(errMessage(error, "Register failed"));
     } finally {
       setIsLoading(false);
     }
@@ -58,12 +93,15 @@ export const useAuth = () => {
     try {
       setIsLoading(true);
       const res = await loginRequest({ email, password });
-      const user = res?.data?.user;
+      const rawUser = res?.data?.user;
+      const safeUser = sanitizeUser(rawUser);
       toast.success(res?.message || "Login successfully");
-      setUser(user);
-      navigate(dashboardRouteFor(user?.role));
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Login failed");
+      setUser(safeUser);
+      // Hard redirect ensures App re-mounts with the new auth state,
+      // avoiding the race condition where navigate() fires before user state commits
+      window.location.replace(dashboardRouteFor(rawUser?.role));
+    } catch (error) {
+      toast.error(errMessage(error, "Login failed"));
     } finally {
       setIsLoading(false);
     }
@@ -72,28 +110,39 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       setIsLoading(true);
-      const res = await logoutRequest();
-      toast.success(res?.message || "Logout successfully");
-      navigate("/");
-      // Defer clearing the user state so the Protected component doesn't
-      // immediately redirect us to /sign-in before the router can process navigate("/")
-      setTimeout(() => {
-        setUser(null);
-      }, 0);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Logout failed");
+      localStorage.removeItem("mock_user");
+      try {
+        await logoutRequest();
+      } catch(err) {
+        // Ignore backend errors in dev mode if it's down
+      }
+      toast.success("Logout successfully");
+      setUser(null);
+      window.location.replace("/sign-in");
+    } catch (error) {
+      toast.error(errMessage(error, "Logout failed"));
     } finally {
       setIsLoading(false);
     }
   };
 
+
   const getUser = async () => {
     try {
       setIsLoading(true);
+      
+      const mockUser = localStorage.getItem("mock_user");
+      if (mockUser) {
+        setUser(JSON.parse(mockUser));
+        return;
+      }
+      
       const res = await getProfileRequest();
-      setUser(res?.data ?? null);
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
+      setUser(sanitizeUser(res?.data));
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 401) {
         setUser(null);
         return;
       }
@@ -107,12 +156,8 @@ export const useAuth = () => {
     try {
       const res = await apiInstance.post("/users/verify-email");
       toast.success(res.data?.message || "Verified successfully");
-      // console.log(res);
-    } catch (error: any) {
-      // console.log(error?.response?.data || error);
-      toast.error(
-        error?.response?.data?.message || "Failed to fetch user data"
-      );
+    } catch (error) {
+      toast.error(errMessage(error, "Failed to verify email"));
     }
   };
 
@@ -127,3 +172,5 @@ export const useAuth = () => {
     verifyEmail,
   };
 };
+
+
