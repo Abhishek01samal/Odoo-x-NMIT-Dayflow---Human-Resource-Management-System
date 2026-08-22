@@ -72,9 +72,9 @@ export const getGoogleLoginCallback = AsyncHandler(
       // 1 Check if OAuth account exists
       let oauthAccount = await prisma.oAuthProvider.findUnique({
         where: {
-          providerName_providerUserId: {
-            providerName: "GOOGLE",
-            providerUserId: googleUserId,
+          provider_providerAccountId: {
+            provider: "GOOGLE",
+            providerAccountId: googleUserId,
           },
         },
       });
@@ -108,8 +108,8 @@ export const getGoogleLoginCallback = AsyncHandler(
           await tx.oAuthProvider.create({
             data: {
               userId: existingUser.id,
-              providerName: "GOOGLE",
-              providerUserId: googleUserId,
+              provider: "GOOGLE",
+              providerAccountId: googleUserId,
             },
           });
 
@@ -249,9 +249,9 @@ export const getGithubLoginCallback = AsyncHandler(
 
       let oauthAccount = await prisma.oAuthProvider.findUnique({
         where: {
-          providerName_providerUserId: {
-            providerName: "GITHUB",
-            providerUserId: githubUserId,
+          provider_providerAccountId: {
+            provider: "GITHUB",
+            providerAccountId: githubUserId,
           },
         },
       });
@@ -281,8 +281,8 @@ export const getGithubLoginCallback = AsyncHandler(
           await tx.oAuthProvider.create({
             data: {
               userId: existingUser.id,
-              providerName: "GITHUB",
-              providerUserId: githubUserId,
+              provider: "GITHUB",
+              providerAccountId: githubUserId,
             },
           });
 

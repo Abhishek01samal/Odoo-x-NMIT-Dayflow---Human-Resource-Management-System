@@ -65,8 +65,8 @@ const registerUser = AsyncHandler(async (req: any, res: any) => {
     await tx.oAuthProvider.create({
       data: {
         userId: createdUser.id,
-        providerName: "LOCAL",
-        providerUserId: createdUser.id,
+        provider: "LOCAL",
+        providerAccountId: createdUser.id,
       },
     });
 

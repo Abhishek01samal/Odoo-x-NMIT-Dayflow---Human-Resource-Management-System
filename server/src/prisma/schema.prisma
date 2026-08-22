@@ -6,37 +6,278 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id         String          @id @default(uuid())
-  name       String
-  email      String          @unique
-  password   String?
-  role       Role            @default(User)
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
-  isVerified Boolean         @default(false)
-  providers  OAuthProvider[]
+enum UserRole {
+  EMPLOYEE
+  HR
+  ADMIN
 }
 
-model OAuthProvider {
-  id             String    @id @default(uuid())
-  providerName   providers
-  providerUserId String
-  userId         String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  user           User      @relation(fields: [userId], references: [id])
-
-  @@unique([providerName, providerUserId])
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
 }
 
-enum Role {
-  User
-  Admin
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LEAVE
 }
 
-enum providers {
+enum LeaveType {
+  PAID
+  SICK
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PayrollStatus {
+  DRAFT
+  PROCESSED
+  PAID
+}
+
+enum NotificationType {
+  INFO
+  LEAVE_UPDATE
+  PAYROLL
+  ATTENDANCE
+  SYSTEM
+}
+
+enum OAuthProviderName {
   LOCAL
   GOOGLE
   GITHUB
+}
+
+enum DocumentType {
+  OFFER_LETTER
+  ID_PROOF
+  CERTIFICATE
+  CONTRACT
+  OTHER
+}
+
+model User {
+  id                String             @id @default(cuid())
+  name              String
+  email             String             @unique
+  passwordHash      String?
+  role              UserRole           @default(EMPLOYEE)
+  isActive          Boolean            @default(true)
+  isVerified        Boolean            @default(false)
+  sessionId         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  profile            EmployeeProfile?
+  oauthProviders     OAuthProvider[]
+  notifications      Notification[]
+  attendance         Attendance[]      @relation("AttendanceOwner")
+  regularizations    Attendance[]      @relation("AttendanceRegularizer")
+  leaveRequests      LeaveRequest[]    @relation("LeaveRequester")
+  reviewedLeaves     LeaveRequest[]    @relation("LeaveReviewer")
+  leaveBalances      LeaveBalance[]
+  salaryStructures   SalaryStructure[]
+  payrollRecords     PayrollRecord[]   @relation("PayrollEmployee")
+  processedPayrolls  PayrollRecord[]   @relation("PayrollProcessor")
+  auditLogs          AuditLog[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model EmployeeProfile {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  employeeId       String             @unique
+  phone            String?
+  dateOfBirth      DateTime?          @db.Date
+  gender           Gender             @default(PREFER_NOT_TO_SAY)
+  address          String?
+  department       String             @default("Unassigned")
+  designation      String             @default("Trainee")
+  joinedAt         DateTime           @db.Date
+  avatarUrl        String?
+  emergencyContact String?
+  bankName         String?
+  bankAccountNo    String?
+  ifscCode         String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents EmployeeDocument[]
+
+  @@index([department])
+  @@index([designation])
+}
+
+model EmployeeDocument {
+  id         String           @id @default(cuid())
+  profileId  String
+  name       String
+  type       DocumentType     @default(OTHER)
+  fileUrl    String
+  mimeType   String?
+  sizeBytes  Int?
+  uploadedAt DateTime         @default(now())
+
+  profile EmployeeProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+}
+
+model Attendance {
+  id              String           @id @default(cuid())
+  userId          String
+  date            DateTime         @db.Date
+  checkInAt       DateTime?
+  checkOutAt      DateTime?
+  workedHours     Float?
+  status          AttendanceStatus @default(PRESENT)
+  note            String?
+  regularizedById String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user          User  @relation("AttendanceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  regularizedBy User? @relation("AttendanceRegularizer", fields: [regularizedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([status])
+}
+
+model LeaveRequest {
+  id            String      @id @default(cuid())
+  userId        String
+  type          LeaveType
+  startDate     DateTime    @db.Date
+  endDate       DateTime    @db.Date
+  days          Float
+  reason        String
+  status        LeaveStatus @default(PENDING)
+  reviewComment String?
+  reviewedAt    DateTime?
+  reviewedById  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user       User  @relation("LeaveRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model LeaveBalance {
+  id         String   @id @default(cuid())
+  userId     String
+  year       Int
+  paidTotal  Float    @default(12)
+  paidUsed   Float    @default(0)
+  sickTotal  Float    @default(6)
+  sickUsed   Float    @default(0)
+  unpaidUsed Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
+  @@index([year])
+}
+
+model SalaryStructure {
+  id            String   @id @default(cuid())
+  userId        String
+  basic         Decimal  @db.Decimal(10, 2)
+  hra           Decimal  @db.Decimal(10, 2)
+  allowances    Decimal  @db.Decimal(10, 2)
+  deductions    Decimal  @db.Decimal(10, 2)
+  effectiveFrom DateTime @db.Date
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+}
+
+model PayrollRecord {
+  id            String        @id @default(cuid())
+  userId        String
+  month         Int
+  year          Int
+  baseNet       Decimal       @db.Decimal(10, 2)
+  lopDays       Float         @default(0)
+  lopDeduction  Decimal       @default(0) @db.Decimal(10, 2)
+  finalPay      Decimal       @db.Decimal(10, 2)
+  status        PayrollStatus @default(DRAFT)
+  processedById String?
+  processedAt   DateTime?
+  payslipUrl    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user        User  @relation("PayrollEmployee", fields: [userId], references: [id], onDelete: Cascade)
+  processedBy User? @relation("PayrollProcessor", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, month, year])
+  @@index([month, year])
+  @@index([status])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
+
+model OAuthProvider {
+  id                String             @id @default(cuid())
+  userId            String
+  provider          OAuthProviderName
+  providerAccountId String
+  createdAt         DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }

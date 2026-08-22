@@ -3,7 +3,7 @@ import { ForbiddenError, UnauthorizedError } from "../utils/api-error.js";
 import type { IPayload } from "../types/jwt.types.js";
 import { ENV } from "../lib/env.js";
 import { redisClient } from "../lib/redis.js";
-import { Role } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 
 const authMiddleware = async (req: any, res: any, next: any) => {
   try {
@@ -50,7 +50,20 @@ const generateRefreshToken = (userData: IPayload) => {
 
 const authorizeAdmin = async (req: any, res: any, next: any) => {
   try {
-    if (req?.user?.role !== Role.Admin) {
+    if (req?.user?.role !== UserRole.ADMIN) {
+      throw new ForbiddenError("Forbidden Request");
+    }
+    next();
+  } catch (error) {
+    return res.status(403).json(new ForbiddenError("Forbidden Request"));
+  }
+};
+
+// HR officers and Admins both get management/approval privileges (see spec 2. User Classes)
+const authorizeStaff = async (req: any, res: any, next: any) => {
+  try {
+    const role = req?.user?.role;
+    if (role !== UserRole.ADMIN && role !== UserRole.HR) {
       throw new ForbiddenError("Forbidden Request");
     }
     next();
@@ -64,4 +77,5 @@ export {
   generateAccessToken,
   generateRefreshToken,
   authorizeAdmin,
+  authorizeStaff,
 };
