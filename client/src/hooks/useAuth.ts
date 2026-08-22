@@ -1,5 +1,11 @@
 import { useAuthContext } from "@/context/AuthContext";
-import apiInstance from "@/services/auth.api";
+import apiInstance from "@/services/api";
+import {
+  loginRequest,
+  registerRequest,
+  logoutRequest,
+  getProfileRequest,
+} from "@/services/auth.api";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router";
 
@@ -26,20 +32,19 @@ export const useAuth = () => {
 
   const navigate = useNavigate();
 
-  // TEMP: route by role until HR/Admin dashboards exist
-  const dashboardRouteFor = (role?: string) =>
-    role === "EMPLOYEE" ? "/employee/dashboard" : "/dashboard";
+  // Role-based landing route — decided by the account's role, never by the user
+  const dashboardRouteFor = (role?: string) => {
+    if (role === "ADMIN") return "/admin/dashboard";
+    if (role === "HR") return "/hr/dashboard";
+    return "/employee/dashboard";
+  };
 
   const register = async ({ name, email, password }: RegisterData) => {
     try {
       setIsLoading(true);
-      const res = await apiInstance.post("/auth/register", {
-        name,
-        email,
-        password,
-      });
-      const user = res?.data?.data?.user;
-      toast.success(res.data?.message || "Register successfully");
+      const res = await registerRequest({ name, email, password });
+      const user = res?.data?.user;
+      toast.success(res?.message || "Register successfully");
       setUser(user);
       navigate(dashboardRouteFor(user?.role));
     } catch (error: any) {
@@ -52,16 +57,12 @@ export const useAuth = () => {
   const login = async ({ email, password }: LoginData) => {
     try {
       setIsLoading(true);
-      const res = await apiInstance.post("/auth/login", {
-        email,
-        password,
-      });
-      const user = res?.data?.data?.user;
-      toast.success(res.data?.message || "Login successfully");
+      const res = await loginRequest({ email, password });
+      const user = res?.data?.user;
+      toast.success(res?.message || "Login successfully");
       setUser(user);
       navigate(dashboardRouteFor(user?.role));
     } catch (error: any) {
-      // console.log(error?.response?.data || error);
       toast.error(error?.response?.data?.message || "Login failed");
     } finally {
       setIsLoading(false);
@@ -71,9 +72,8 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       setIsLoading(true);
-      const res = await apiInstance.post("/auth/logout");
-      // console.log(res);
-      toast.success(res.data?.message || "Logout successfully");
+      const res = await logoutRequest();
+      toast.success(res?.message || "Logout successfully");
       navigate("/");
       // Defer clearing the user state so the Protected component doesn't
       // immediately redirect us to /sign-in before the router can process navigate("/")
@@ -81,7 +81,6 @@ export const useAuth = () => {
         setUser(null);
       }, 0);
     } catch (error: any) {
-      // console.log(error);
       toast.error(error?.response?.data?.message || "Logout failed");
     } finally {
       setIsLoading(false);
@@ -91,17 +90,13 @@ export const useAuth = () => {
   const getUser = async () => {
     try {
       setIsLoading(true);
-      const res = await apiInstance.get("/users/profile");
-      setUser(res?.data?.data);
+      const res = await getProfileRequest();
+      setUser(res?.data ?? null);
     } catch (error: any) {
       if (error?.response?.status === 401) {
         setUser(null);
         return;
       }
-      // console.log(error?.response?.data || error);
-      // toast.error(
-      //   error?.response?.data?.message || "Failed to fetch user data",
-      // );
     } finally {
       setIsLoading(false);
       setIsInitialized(true);

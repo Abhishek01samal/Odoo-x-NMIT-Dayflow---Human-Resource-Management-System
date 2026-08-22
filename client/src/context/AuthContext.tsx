@@ -32,22 +32,10 @@ export const useAuthContext = () => {
 };
 
 function AuthContextProvider({ children }: { children: ReactNode }) {
-  const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
-  const [user, setUser] = useState<User | null>(
-    DEMO_MODE
-      ? {
-          id: "demo-user-001",
-          name: "Abhishek Kumar",
-          email: "abhishek@dayflow.dev",
-          role: "EMPLOYEE",
-          isVerified: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      : null
-  );
+  // Everyone starts logged out — role comes from the account at sign-in time
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isInitialized, setIsInitialized] = useState<boolean>(DEMO_MODE);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   return (
     <>
       <AuthContext.Provider

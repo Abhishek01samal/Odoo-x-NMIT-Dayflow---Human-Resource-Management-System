@@ -29,20 +29,16 @@ const App = () => {
 
   const location = useLocation();
 
-  // TEMP: role-based home until HR/Admin dashboards exist
-  const homeFor = user?.role === "EMPLOYEE" ? "/employee/dashboard" : "/dashboard";
+  // Landing route per role — the account decides, not a role picker
+  const homeFor =
+    user?.role === "ADMIN"
+      ? "/admin/dashboard"
+      : user?.role === "HR"
+        ? "/hr/dashboard"
+        : "/employee/dashboard";
 
   useEffect(() => {
-    const publicRoutes = [
-      "/sign-in",
-      "/sign-up",
-      "/forgot-password",
-      "/reset-password",
-    ];
-
-    const isPublicRoute = publicRoutes.includes(location.pathname);
-
-    if (!isInitialized && !isPublicRoute) {
+    if (!isInitialized) {
       getUser();
     }
   }, [isInitialized, location.pathname]);

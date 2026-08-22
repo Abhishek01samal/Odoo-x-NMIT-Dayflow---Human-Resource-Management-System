@@ -6,29 +6,52 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { FcGoogle } from "react-icons/fc";
-import { FaGithub } from "react-icons/fa";
 import { useAuth } from "@/hooks/useAuth";
 import { Spinner } from "@/components/ui/spinner";
 import { useNavigate } from "react-router";
 import { Link } from "react-router";
 
+const DEMO_ACCOUNTS = [
+  { label: "Admin", email: "admin@dayflow.io", password: "Admin@123" },
+  { label: "HR", email: "hr@dayflow.io", password: "Hr@12345" },
+  {
+    label: "Employee",
+    email: "employee@dayflow.io",
+    password: "Employee@123",
+  },
+];
+
+const REMEMBER_KEY = "dayflow.rememberEmail";
+
 const SignIn = () => {
-  const [email, setEmail] = useState<string>("");
+  const [email, setEmail] = useState<string>(
+    () => localStorage.getItem(REMEMBER_KEY) ?? ""
+  );
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [remember, setRemember] = useState<boolean>(
+    () => !!localStorage.getItem(REMEMBER_KEY)
+  );
   const navigate = useNavigate();
   const { isLoading, login } = useAuth();
 
+  const fillDemoAccount = (account: (typeof DEMO_ACCOUNTS)[number]) => {
+    setEmail(account.email);
+    setPassword(account.password);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (remember) {
+      localStorage.setItem(REMEMBER_KEY, email);
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
     login({ email, password });
-    // console.log("Form submitted with:", { email, password });
   };
 
   if (isLoading) {
@@ -51,7 +74,7 @@ const SignIn = () => {
                       Welcome back
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                      Sign in to your Auth System account
+                      Sign in to Dayflow — Human Resource Management
                     </p>
                   </div>
 
@@ -121,12 +144,43 @@ const SignIn = () => {
                     </div>
                   </Field>
 
+                  {/* Remember me */}
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      className="size-4 rounded border-border accent-[var(--primary)]"
+                    />
+                    Remember me
+                  </label>
+
                   {/* Submit */}
                   <Field>
                     <Button type="submit" className="w-full cursor-pointer">
                       {isLoading ? "Signing in..." : " Sign In"}
                     </Button>
                   </Field>
+
+                  {/* Demo accounts — one-click fill */}
+                  <div className="rounded-lg border border-dashed border-border bg-muted/40 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                      Demo accounts — click to fill
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {DEMO_ACCOUNTS.map((account) => (
+                        <button
+                          key={account.email}
+                          type="button"
+                          disabled={isLoading}
+                          onClick={() => fillDemoAccount(account)}
+                          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium hover:border-primary/50 hover:text-primary transition-colors disabled:opacity-50"
+                        >
+                          {account.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Divider */}
                   {/* <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
